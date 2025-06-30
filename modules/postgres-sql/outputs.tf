@@ -1,4 +1,4 @@
-output "example" {
-  description = "Example output for postgres-sql"
-  value       = var.example
+output "id" {
+  description = "ID of the PostgreSQL flexible server"
+  value       = azurerm_postgresql_flexible_server.psql.id
 }
