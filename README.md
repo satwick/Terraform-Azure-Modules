@@ -1,46 +1,42 @@
-# Route Table
+# Terraform Azure Modules
 
-## Introduction
+This repository contains reusable Terraform code for deploying resources on Microsoft Azure. Each folder under `modules/` represents a standalone module that can be integrated into your own Terraform configurations. The `deployment/` directory provides a simple example of how these modules can be consumed together.
 
-This module is used to create an Route Table, which configures where the traffic from and to a virtual network or subnet is routed.
+## Repository Structure
 
-<!-- BEGIN_TF_DOCS -->
-## Requirements
+- **deployment/** – Sample root configuration demonstrating module usage.
+- **modules/** – Collection of reusable Terraform modules:
+  - **aks/** – Deploys an Azure Kubernetes Service cluster.
+  - **application-gateway/** – Creates an Azure Application Gateway that can serve as an ingress controller.
+  - **azure-sql-server/** – Provisions an Azure SQL Database server with a private endpoint.
+  - **key-vault/** – Manages an Azure Key Vault instance.
+  - **postgres-sql/** – Deploys a PostgreSQL Flexible Server.
+  - **route-table/** – Defines custom route tables for virtual networks.
+  - **storage-account/** – Creates a storage account with optional private endpoint and containers.
+  - **v-net/** – Builds a virtual network and subnets for hub/spoke scenarios.
+  - **vm-linux/** – Deploys a Linux virtual machine.
+  - **vm-windows/** – Deploys a Windows virtual machine.
 
-| Name | Version |
-|------|---------|
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.71.0 |
+Each module contains its own `README.md` describing available variables, outputs and any specific considerations.
 
-## Providers
+## Prerequisites
 
-| Name | Version |
-|------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.71.0 |
+- [Terraform](https://www.terraform.io/downloads.html) 1.x installed
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and authenticated
+- Access to an Azure subscription with permission to create resources
 
-## Modules
+## Getting Started
 
-No modules.
+1. Change into the `deployment` directory:
+   ```bash
+   cd deployment
+   terraform init
+   ```
+2. Review `variables.tf` and supply any required values, either by editing a `terraform.tfvars` file or via CLI variables.
+3. Run Terraform to review and apply changes:
+   ```bash
+   terraform plan
+   terraform apply
+   ```
 
-## Resources
-
-| Name | Type |
-|------|------|
-| [azurerm_route_table.table](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/route_table) | resource |
-
-## Inputs
-
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_disable_bgp_route_propagation"></a> [disable\_bgp\_route\_propagation](#input\_disable\_bgp\_route\_propagation) | Enable/disable bgp route propagation | `bool` | `false` | no |
-| <a name="input_location"></a> [location](#input\_location) | Region for deployment | `string` | `"West Europe"` | no |
-| <a name="input_name"></a> [name](#input\_name) | Name of Azure Kubernetes Service | `string` | n/a | yes |
-| <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name) | Name of the Resource group | `string` | n/a | yes |
-| <a name="input_route_table_routes"></a> [route\_table\_routes](#input\_route\_table\_routes) | The list of route definitions applied to the custom route table. | `map(any)` | `null` | no |
-| <a name="input_tags"></a> [tags](#input\_tags) | Tags for resources | `map(string)` | n/a | yes |
-
-## Outputs
-
-| Name | Description |
-|------|-------------|
-| <a name="output_route_table_id"></a> [route\_table\_id](#output\_route\_table\_id) | The ID of the deployed route table |
-<!-- END_TF_DOCS -->
+Refer to the module READMEs for detailed information on configuring each module.
