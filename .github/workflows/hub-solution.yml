@@ -1,0 +1,45 @@
+name: 'Terraform Hub Solution'
+
+on:
+  push:
+    paths:
+      - 'solutions/hub-solution/**'
+      - '.github/workflows/hub-solution.yml'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'solutions/hub-solution/**'
+      - '.github/workflows/hub-solution.yml'
+
+jobs:
+  terraform:
+    name: 'Terraform Hub Solution'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: solutions/hub-solution
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: GitHub CLI Login
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve
