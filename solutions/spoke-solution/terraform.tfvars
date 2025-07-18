@@ -70,83 +70,8 @@ devspoke_route_table_routes = {
     "next_hop_type"          = "VirtualAppliance"
     "next_hop_in_ip_address" = ""
   },
-  #-- UDR to on-prem email server
-  "built2hubfw53151" = {
-    "name"                   = ""
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- UDR to on-prem DNS server
-  "built2hubfw5318" = {
-    "name"                   = "route-built2hubfw5318"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- UDR to on-prem SAP server
-  "built2hubfw5316" = {
-    "name"                   = "route-built2hubfw5316"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- UDR to on-prem SAP server
-  "built2hubfw5348" = {
-    "name"                   = ""
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- UDR to on-prem GIT
-  "built2hubfw5320045" = {
-    "name"                   = "route-built2hubfw5320045"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- to hub VM's
-  "2hubVMs" = {
-    "name"                   = "route-2hubVMs"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- 53.254
-  "53.254" = {
-    "name"                   = "route-53.254"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = "4"
-  },
-  # -- 53.29-DNS
-  "53.29-DNS" = {
-    "name"                   = "route-5-DNS"
-    "address_prefix"         = "6"
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = ""
-  },
-  # -- 53.17
-  "53.17" = {
-    "name"                   = "route-5"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = "5"
-  },
 
-  "53.200.41" = {
-    "name"                   = "route-TestZGDOK"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = "5"
-  },
 
-  "53.200.42" = {
-    "name"                   = "route-ProdZGDOK"
-    "address_prefix"         = ""
-    "next_hop_type"          = "VirtualAppliance"
-    "next_hop_in_ip_address" = "5"
-  },
 }
 
 # Linux VM
