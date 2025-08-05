@@ -1,1 +1,163 @@
 .
+name: 'Terraform Plan and Deployment'
+on:
+  push:
+    branches:
+      - 'main'
+      
+    paths:
+      - 'deployments/devenv/**' # Trigger on changes to devenv deployment directory.
+
+#Special permissions required for OIDC authentication
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+#Environment variables for Terraform Azure provider
+env:
+  ARM_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID_DEV  }}"
+  ARM_CLIENT_SECRET: "${{ secrets.AZURE_CLIENT_SECRET_DEV }}"
+  ARM_SUBSCRIPTION_ID: "${{ secrets.AZURE_SUBSCRIPTION_ID_DEV }}"
+  ARM_TENANT_ID: "${{ secrets.AZURE_TENANT_ID_DEV  }}"
+  TF_BACKEND_STORAGE_ACCOUNT: ${{ secrets.TF_BACKEND_STORAGE_ACCOUNT_DEV }}
+  TF_BACKEND_CONTAINER: ${{ secrets.TF_BACKEND_CONTAINER_DEV }}
+  TF_BACKEND_KEY: ${{ secrets.TF_BACKEND_KEY_DEV }}
+  TF_BACKEND_ACCESS_KEY: ${{ secrets.TF_BACKEND_ACCESS_KEY_DEV }}
+  GIT_PAT: ${{secrets.GIT_PAT_DEV}}
+  VM_LINUX_PASSWORD: ${{ secrets.VM_LINUX_PASSWORD }}
+  VM_WINDOWS_PASSWORD: ${{ secrets.VM_WINDOWS_PASSWORD }} 
+  PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
+  SQL_SERVER_ADMINISTRATOR_LOGIN_PASSWORD: ${{secrets.SQL_SERVER_ADMINISTRATOR_LOGIN_PASSWORD}}
+  CLIENT_ID_TARGET_DEV_HUB: ${{ secrets.CLIENT_ID_TARGET_DEV_HUB }}
+  CLIENT_SECRET_TARGET_DEV_HUB: ${{ secrets.CLIENT_SECRET_TARGET_DEV_HUB }}
+  TENANT_ID_TARGET_DEV_HUB: ${{ secrets.TENANT_ID_TARGET_DEV_HUB }}
+
+  ARM_SKIP_PROVIDER_REGISTRATION: true
+  WORKDIR: ${{ github.workspace }}/deployments/devenv
+
+jobs:
+  terraform-plan:
+    name: 'Terraform Plan'  # Name of the job
+    runs-on: Azure-Unite-TF # Runner
+    environment: devspoke   # ENVIRONMENT should be changed when merged with main branch
+
+    steps:
+      # checkout
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      # Configure Terraform
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.7.3
+
+       # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+      - name: Terraform Init
+        run: |
+         git config --global url."https://PU_SVC_DFLBUS:$GIT_PAT@git.t3.daimlertruck.com".insteadOf https://git.t3.daimlertruck.com
+          cd $WORKDIR
+          terraform init \
+            -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+            -backend-config="key=${TF_BACKEND_KEY}" \
+            -backend-config="access_key=${TF_BACKEND_ACCESS_KEY}"
+
+        # Terraform Validate
+      - name: Terraform Validate
+        run: |
+          cd $WORKDIR
+          terraform validate
+
+      # Generates an execution plan for Terraform
+      # An exit code of 0 indicated no changes, 1 a terraform failure, 2 there are pending changes.
+      - name: Terraform Plan
+        id: tf-plan
+        run: |
+         export exitcode=0
+         cd $WORKDIR    
+         terraform plan -detailed-exitcode -no-color -out tfplan -var-file="$WORKDIR/devenv.tfvars" -var "client_id_target=$CLIENT_ID_TARGET_DEV_HUB" -var "client_secret_target=$CLIENT_SECRET_TARGET_DEV_HUB" -var "tenant_id_target=$TENANT_ID_TARGET_DEV_HUB" -var "vm_linux_password=$VM_LINUX_PASSWORD" -var "vm_windows_password=$VM_WINDOWS_PASSWORD" -var "sql_server_administrator_login_password=$SQL_SERVER_ADMINISTRATOR_LOGIN_PASSWORD" -var "psql_password=$PSQL_PASSWORD"
+         echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
+          if [ $exitcode -eq 1 ]; then
+          echo Terraform Plan Failed!
+          exit 1
+          else
+          exit 0
+          fi
+          # Save plan to artifacts
+
+     # Publish Terraform Plan using upload-artifacts
+      - name: Publish Terraform Plan
+        uses: actions/upload-artifact@v3
+        with:
+         name: tfplan
+         path: ${{ github.workspace }}/deployments/devenv/tfplan
+
+           
+      # Terraform plan summary
+      - name: Create Terraform Plan Summary
+        id: tf-plan-string
+        run: |
+         # Navigate to the deployments/devenv directory
+         cd $WORKDIR
+         TERRAFORM_PLAN=$(terraform show -no-color tfplan)
+
+         delimiter="$(openssl rand -hex 8)"
+         echo "summary<<${delimiter}" >> $GITHUB_OUTPUT
+         echo "## Terraform Plan Output" >> $GITHUB_OUTPUT
+         echo "<details><summary>Click to expand</summary>" >> $GITHUB_OUTPUT
+         echo "" >> $GITHUB_OUTPUT
+         echo '```terraform' >> $GITHUB_OUTPUT
+         echo "$TERRAFORM_PLAN" >> $GITHUB_OUTPUT
+         echo '```' >> $GITHUB_OUTPUT
+         echo "</details>" >> $GITHUB_OUTPUT
+         echo "${delimiter}" >> $GITHUB_OUTPUT
+
+
+    # Publish Terraform Plan as task summary
+      - name: Publish Terraform Plan to Task Summary
+        env:
+         SUMMARY: ${{ steps.tf-plan-string.outputs.summary }}
+        run: |
+         echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+  terraform-approval:
+     name: 'Terraform Approval'
+     runs-on: Azure-Unite-TF
+     environment: devspoke
+     needs: [terraform-plan]
+       
+     steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2
+        with:
+            terraform_version: 1.7.3
+            
+      # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+      - name: Terraform Init
+        run: |
+         git config --global url."https://PU_SVC_DFLBUS:$GIT_PAT@git.t3.daimlertruck.com".insteadOf https://git.t3.daimlertruck.com
+         cd $WORKDIR
+         terraform init \
+          -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+          -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+          -backend-config="key=${TF_BACKEND_KEY}" \
+          -backend-config="access_key=${TF_BACKEND_ACCESS_KEY}"
+                  
+      # Download saved plan from artifacts  
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v3
+        with:
+          name: tfplan
+          path: ${{ github.workspace }}/deployments/devenv
+  
+      # Terraform Apply
+      - name: Terraform Apply
+        run: |
+          cd $WORKDIR
+          terraform apply tfplan
