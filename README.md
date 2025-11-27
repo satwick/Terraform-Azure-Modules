@@ -4,7 +4,7 @@ This repository contains reusable Terraform code for deploying resources on Micr
 
 [![Terraform CI](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml/badge.svg)](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml)
 
-See [.github/README.md](.github/README.md) for details on the CI pipeline.
+See [.github/README.md](.github/README.md) for details on the CI pipeline. 
 
 ## Repository Structure
 
