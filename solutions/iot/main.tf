@@ -94,7 +94,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "westeurope-kusto-windo
 }
 
 module "iot_vnet" {
-  source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-vnet.git?ref=v1.0.0"
+  source = "../../modules/v-net"
 
   name                = var.iot_vnet_name
   location            = azurerm_resource_group.iot.location
@@ -121,77 +121,80 @@ module "iot_vnet" {
   tags = var.tags
 }
 
-module "eventhub" {
-  source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-eventhub.git?ref=v1.1.0"
+# module "eventhub" {
+#   # source = "../../modules/eventhub" # Module missing in this repo
+#   source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-eventhub.git?ref=v1.1.0"
+#
+#   name                = var.event_hub_namespace_name
+#   location            = azurerm_resource_group.iot.location
+#   resource_group_name = azurerm_resource_group.iot.name
+#
+#   private_endpoint_name = var.eventhub_private_endpoint_name
+#   private_dns_zone_ids = [
+#     azurerm_private_dns_zone.private_dns_zones["servicebus-windows-net"].id
+#   ]
+#   subnet_id = module.iot_vnet.subnet_ids["iot-snet"]
+#
+#   eventhubs = {
+#     "ingest-test" = {
+#       name              = "ingest-test"
+#       message_retention = 7
+#       partition_count   = 1
+#     }
+#   }
+#
+#   tags = var.tags
+# }
 
-  name                = var.event_hub_namespace_name
-  location            = azurerm_resource_group.iot.location
-  resource_group_name = azurerm_resource_group.iot.name
+# module "eventhub_pe" {
+#   # source = "../../modules/private-endpoint" # Module missing in this repo
+#   source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-privateendpoint.git?ref=v1.0.0"
+#
+#   providers = {
+#     azurerm.target = azurerm.target
+#   }
+#
+#   target_resource_group_name = var.target_resource_group_name
+#   target_vnet_name           = var.target_vnet_name
+#   target_snet_name           = var.target_snet_name
+#   pe_resource_group_name     = var.pe_resource_group_name
+#   pe_resource_group_location = var.pe_resource_group_location
+#   private_endpoint_name      = "${var.eventhub_private_endpoint_name}-hub"
+#   resource_id                = module.eventhub.event_hub_namespace_id
+#   subresource_name           = var.eventhub_subresource_name
+#   private_dns_zone_ids = [
+#     data.azurerm_private_dns_zone.servicebus-windows-net.id
+#   ]
+# }
 
-  private_endpoint_name = var.eventhub_private_endpoint_name
-  private_dns_zone_ids = [
-    azurerm_private_dns_zone.private_dns_zones["servicebus-windows-net"].id
-  ]
-  subnet_id = module.iot_vnet.subnet_ids["iot-snet"]
-
-  eventhubs = {
-    "ingest-test" = {
-      name              = "ingest-test"
-      message_retention = 7
-      partition_count   = 1
-    }
-  }
-
-  tags = var.tags
-}
-
-module "eventhub_pe" {
-  source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-privateendpoint.git?ref=v1.0.0"
-
-  providers = {
-    azurerm.target = azurerm.target
-  }
-
-  target_resource_group_name = var.target_resource_group_name
-  target_vnet_name           = var.target_vnet_name
-  target_snet_name           = var.target_snet_name
-  pe_resource_group_name     = var.pe_resource_group_name
-  pe_resource_group_location = var.pe_resource_group_location
-  private_endpoint_name      = "${var.eventhub_private_endpoint_name}-hub"
-  resource_id                = module.eventhub.event_hub_namespace_id
-  subresource_name           = var.eventhub_subresource_name
-  private_dns_zone_ids = [
-    data.azurerm_private_dns_zone.servicebus-windows-net.id
-  ]
-}
-
-module "adx" {
-  source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-adx.git?ref=v1.1.1"
-
-  name                = var.adx_name
-  location            = azurerm_resource_group.iot.location
-  resource_group_name = azurerm_resource_group.iot.name
-  database_name       = var.adx_database_name
-  sku                 = var.adx_sku
-  capacity            = var.adx_capacity
-  subnet_id           = module.iot_vnet.subnet_ids["iot-snet"]
-  nsg_name            = var.adx_nsg_name
-
-  eventhubs = {
-    for name, abbreviation in {
-      "ingest-test" = "test"
-      } : name => {
-      kusto_eventhub_data_connection_name = "eventhub-ingest-connection-${abbreviation}"
-      eventhub_id                         = module.eventhub.event_hub_ids[name]
-      eventhub_abbreviation               = abbreviation
-      eventhub_consumer_group             = module.eventhub.eventhub_consumer_groups[name]
-    }
-  }
-
-  private_endpoint_name = var.adx_private_endpoint_name
-  private_dns_zone_ids = [
-    data.azurerm_private_dns_zone.westeurope-kusto-windows-net.id
-  ]
-
-  tags = var.tags
-}
+# module "adx" {
+#   # source = "../../modules/adx" # Module missing in this repo
+#   source = "git::https://git.t3.daimlertruck.com/DFL-BUS/tf-module-adx.git?ref=v1.1.1"
+#
+#   name                = var.adx_name
+#   location            = azurerm_resource_group.iot.location
+#   resource_group_name = azurerm_resource_group.iot.name
+#   database_name       = var.adx_database_name
+#   sku                 = var.adx_sku
+#   capacity            = var.adx_capacity
+#   subnet_id           = module.iot_vnet.subnet_ids["iot-snet"]
+#   nsg_name            = var.adx_nsg_name
+#
+#   eventhubs = {
+#     for name, abbreviation in {
+#       "ingest-test" = "test"
+#       } : name => {
+#       kusto_eventhub_data_connection_name = "eventhub-ingest-connection-${abbreviation}"
+#       eventhub_id                         = module.eventhub.event_hub_ids[name]
+#       eventhub_abbreviation               = abbreviation
+#       eventhub_consumer_group             = module.eventhub.eventhub_consumer_groups[name]
+#     }
+#   }
+#
+#   private_endpoint_name = var.adx_private_endpoint_name
+#   private_dns_zone_ids = [
+#     data.azurerm_private_dns_zone.westeurope-kusto-windows-net.id
+#   ]
+#
+#   tags = var.tags
+# }
