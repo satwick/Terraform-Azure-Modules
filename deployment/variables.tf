@@ -25,7 +25,7 @@ variable "vnet_address_space" {
 variable "tags" {
   description = "Tags"
   type        = map(string)
-  default     = {
+  default = {
     Environment = "Dev"
     Project     = "Portfolio"
   }

@@ -2,6 +2,10 @@
 
 This repository contains reusable Terraform code for deploying resources on Microsoft Azure. Each folder under `modules/` represents a standalone module that can be integrated into your own Terraform configurations. The `deployment/` directory provides a simple example of how these modules can be consumed together.
 
+[![Terraform CI](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml/badge.svg)](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml)
+
+See [.github/README.md](.github/README.md) for details on the CI pipeline.
+
 ## Repository Structure
 
 - **deployment/** – Sample root configuration demonstrating module usage.
