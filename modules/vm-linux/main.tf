@@ -2,14 +2,7 @@
 # Provider section #
 ####################
 
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~>3.98.0"
-    }
-  }
-}
+
 
 provider "azurerm" {
   features {}
@@ -67,5 +60,5 @@ resource "azurerm_linux_virtual_machine" "vm" {
   custom_data = filebase64("${var.custom_data_path}")
   #custom_data = filebase64("../built-cloud-standard.sh")
 
-   depends_on = [var.vmlinux_depends_on]
+  depends_on = [var.vmlinux_depends_on]
 }

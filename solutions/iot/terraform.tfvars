@@ -8,10 +8,10 @@ tags = {
 
 # VNet
 iot_vnet_name          = "dflbus-iottest-vnet"
-iot_vnet_address_space = [172.x.x."]
+iot_vnet_address_space = ["172.16.0.0/16"]
 
-iot_snet_address_prefix     = "172.x.x."
-support_snet_address_prefix = "172.x.x."
+iot_snet_address_prefix     = "172.16.1.0/24"
+support_snet_address_prefix = "172.16.2.0/24"
 
 # Target ENV
 target_subscription_id         = "6bcxxx-xxxx-xxxx"

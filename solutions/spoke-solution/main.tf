@@ -300,7 +300,7 @@ module "devspoke_keyvault" {
   public_network_access     = var.devspoke_keyvault_public_network_access
   enable_rbac_authorization = var.devspoke_keyvault_enable_rbac_authorization
   keyvault_depends_on       = [module.support_vm_windows]
-    keyvault_network_acls = {
+  keyvault_network_acls = {
     bypass         = var.keyvault_network_acls.bypass
     default_action = var.keyvault_network_acls.default_action
     ip_rules       = var.keyvault_network_acls.ip_rules
@@ -326,7 +326,7 @@ module "montaviz_keyvault" {
   public_network_access     = var.montaviz_keyvault_public_network_access
   enable_rbac_authorization = var.montaviz_keyvault_enable_rbac_authorization
   keyvault_depends_on       = [module.devspoke_keyvault]
-    keyvault_network_acls = {
+  keyvault_network_acls = {
     bypass         = var.keyvault_network_acls.bypass
     default_action = var.keyvault_network_acls.default_action
     ip_rules       = var.keyvault_network_acls.ip_rules

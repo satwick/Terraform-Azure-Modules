@@ -16,6 +16,9 @@ This repository contains reusable Terraform code for deploying resources on Micr
   - **v-net/** – Builds a virtual network and subnets for hub/spoke scenarios.
   - **vm-linux/** – Deploys a Linux virtual machine.
   - **vm-windows/** – Deploys a Windows virtual machine.
+- **solutions/** – Reference architectures combining multiple modules:
+  - **iot/** – Example IoT solution architecture.
+  - **spoke-solution/** – Example spoke network deployment.
 
 Each module contains its own `README.md` describing available variables, outputs and any specific considerations.
 

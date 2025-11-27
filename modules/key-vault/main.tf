@@ -2,14 +2,7 @@
 # Provider section #
 ####################
 
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~>3.98.0"
-    }
-  }
-}
+
 
 provider "azurerm" {
   features {
@@ -29,7 +22,7 @@ data "azurerm_client_config" "current" {}
 
 #https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault
 resource "azurerm_key_vault" "key-vault" {
-  
+
   name                          = var.name
   location                      = var.location
   resource_group_name           = var.resource_group_name
@@ -40,13 +33,13 @@ resource "azurerm_key_vault" "key-vault" {
   public_network_access_enabled = var.public_network_access
   enable_rbac_authorization     = var.enable_rbac_authorization
   depends_on                    = [var.keyvault_depends_on]
-    network_acls {
+  network_acls {
     bypass                     = var.keyvault_network_acls.bypass
     default_action             = var.keyvault_network_acls.default_action
     ip_rules                   = var.keyvault_network_acls.ip_rules
     virtual_network_subnet_ids = var.keyvault_network_acls.virtual_network_subnet_ids
   }
-  
+
 }
 
 #https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint

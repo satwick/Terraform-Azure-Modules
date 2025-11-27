@@ -78,6 +78,6 @@ variable "zone" {
 
 variable "psqlflex_depends_on" {
   description = "using this variable to propagate dependencies"
-  type    = any
-  default = []
+  type        = any
+  default     = []
 }

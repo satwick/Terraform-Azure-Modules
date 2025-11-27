@@ -2,14 +2,7 @@
 # Provider section #
 ####################
 
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~>3.98.0"
-    }
-  }
-}
+
 
 provider "azurerm" {
   features {}
@@ -63,9 +56,9 @@ resource "azurerm_kubernetes_cluster" "aks" {
   lifecycle {
     ignore_changes = [
       default_node_pool[0].node_count,
-      oms_agent[0].log_analytics_workspace_id ,
-      oms_agent[0].msi_auth_for_monitoring_enabled ,
-      oms_agent[0].oms_agent_identity 
+      oms_agent[0].log_analytics_workspace_id,
+      oms_agent[0].msi_auth_for_monitoring_enabled,
+      oms_agent[0].oms_agent_identity
 
     ]
   }

@@ -43,8 +43,8 @@ variable "minimum_tls_version" {
 
 variable "sql_depends_on" {
   description = "using this variable to propagate dependencies"
-  type    = any
-  default = []
+  type        = any
+  default     = []
 }
 
 variable "private_endpoint" {
