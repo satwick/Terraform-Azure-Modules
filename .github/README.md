@@ -1,49 +1,36 @@
-# Terraform Azure Modules
+# CI/CD Pipeline Documentation
 
-This repository contains reusable Terraform code for deploying resources on Microsoft Azure. Each folder under `modules/` represents a standalone module that can be integrated into your own Terraform configurations. The `deployment/` directory provides a simple example of how these modules can be consumed together.
+This repository uses GitHub Actions to ensure code quality and correctness.
 
-[![Terraform CI](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml/badge.svg)](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml)
+## Workflows
 
-See [.github/README.md](.github/README.md) for details on the CI pipeline. 
+**Terraform CI** (defined in `.github/workflows/terraform.yml`) triggers on:
+- Push to `main` branch
+- Pull requests to `main` branch
 
-## Repository Structure
+## Checks Performed
 
-- **deployment/** – Sample root configuration demonstrating module usage.
-- **modules/** – Collection of reusable Terraform modules:
-  - **aks/** – Deploys an Azure Kubernetes Service cluster.
-  - **application-gateway/** – Creates an Azure Application Gateway that can serve as an ingress controller.
-  - **azure-sql-server/** – Provisions an Azure SQL Database server with a private endpoint.
-  - **key-vault/** – Manages an Azure Key Vault instance.
-  - **postgres-sql/** – Deploys a PostgreSQL Flexible Server.
-  - **route-table/** – Defines custom route tables for virtual networks.
-  - **storage-account/** – Creates a storage account with optional private endpoint and containers.
-  - **v-net/** – Builds a virtual network and subnets for hub/spoke scenarios.
-  - **vm-linux/** – Deploys a Linux virtual machine.
-  - **vm-windows/** – Deploys a Windows virtual machine.
-- **solutions/** – Reference architectures combining multiple modules:
-  - **iot/** – Example IoT solution architecture.
-  - **spoke-solution/** – Example spoke network deployment.
+The pipeline runs the following checks:
 
-Each module contains its own `README.md` describing available variables, outputs and any specific considerations.
+1.  **Format Check**: 
+    - Runs `terraform fmt -check -recursive`
+    - Ensures all Terraform files follow standard formatting conventions.
 
-## Prerequisites
+2.  **Deployment Validation**:
+    - Runs `terraform init` and `terraform validate` in the `deployment/` directory.
+    - Verifies syntax and configuration validity for the main deployment example.
 
-- [Terraform](https://www.terraform.io/downloads.html) 1.x installed
-- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and authenticated
-- Access to an Azure subscription with permission to create resources
+3.  **IoT Solution Validation**:
+    - Runs `terraform init` and `terraform validate` in `solutions/iot/`.
+    - validates the IoT reference architecture configuration.
 
-## Getting Started
+4.  **Spoke Solution Validation**:
+    - Runs `terraform init` and `terraform validate` in `solutions/spoke-solution/`.
+    - Validates the Spoke Network reference architecture.
 
-1. Change into the `deployment` directory:
-   ```bash
-   cd deployment
-   terraform init
-   ```
-2. Review `variables.tf` and supply any required values, either by editing a `terraform.tfvars` file or via CLI variables.
-3. Run Terraform to review and apply changes:
-   ```bash
-   terraform plan
-   terraform apply
-   ```
+## How to Check Results
 
-Refer to the module READMEs for detailed information on configuring each module.
+When you open a Pull Request:
+1.  Navigate to the "Checks" tab or scroll to the bottom of the PR conversation.
+2.  If a check fails, click "Details" to see the full log.
+3.  Fix the issue locally (e.g., run `terraform fmt -recursive`) and push again.

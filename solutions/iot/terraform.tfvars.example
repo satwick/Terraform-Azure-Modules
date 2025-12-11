@@ -1,0 +1,38 @@
+# Common
+location            = "West Europe"
+resource_group_name = "rg-iot-dev-001"
+tags = {
+  Environment = "Dev"
+  Project     = "IoT Solution"
+}
+
+# VNet
+iot_vnet_name             = "vnet-iot-dev-001"
+iot_vnet_address_space    = ["172.30.0.0/16"]
+support_snet_address_prefix = "172.30.0.0/24"
+iot_snet_address_prefix   = "172.30.1.0/24"
+
+# Event Hub
+event_hub_namespace_name       = "evhns-iot-dev-001"
+eventhub_private_endpoint_name = "pe-evh-iot-dev-001"
+eventhub_subresource_name      = ["namespace"]
+
+# Private Endpoint Targets
+target_dns_resource_group_name = "rg-dns-core-001"
+target_subscription_id         = "00000000-0000-0000-0000-000000000000"
+client_id_target               = "00000000-0000-0000-0000-000000000000"
+client_secret_target           = "client-secret-value"
+tenant_id_target               = "00000000-0000-0000-0000-000000000000"
+target_resource_group_name     = "rg-hub-core-001"
+target_vnet_name               = "vnet-hub-core-001"
+target_snet_name               = "snet-pe-core-001"
+pe_resource_group_name         = "rg-pe-iot-dev-001"
+pe_resource_group_location     = "West Europe"
+
+# Azure Data Explorer
+adx_name                    = "adx-iot-dev-001"
+adx_database_name           = "db-adx-iot-dev-001"
+adx_sku                     = "Dev(No SLA)_Standard_E2a_v4"
+adx_capacity                = 1
+adx_nsg_name                = "nsg-adx-iot-dev-001"
+adx_private_endpoint_name   = "pe-adx-iot-dev-001"
