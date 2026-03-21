@@ -1,0 +1,342 @@
+name: 'Azure Deploy (Multi-Environment)'
+
+on:
+  push:
+    branches: 
+      - "main"           # Deploys to production
+      - "staging"        # Deploys to staging
+      - "develop"        # Deploys to dev
+    paths:
+      - 'solutions/**'
+      - 'deployment/**'
+      - '.github/workflows/azure-deploy-multi-env.yml'
+  pull_request:
+    branches: [ "main", "staging", "develop" ]
+    paths:
+      - 'solutions/**'
+      - 'deployment/**'
+
+# Deployments queue (never cancel a running apply)
+concurrency:
+  group: terraform-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_USE_OIDC: true
+
+jobs:
+  # Determine which environment to deploy to based on the branch
+  determine-environment:
+    name: 'Determine Environment'
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      tf-workspace: ${{ steps.set-env.outputs.tf-workspace }}
+    
+    steps:
+      - name: Set Environment Based on Branch
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "tf-workspace=prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "tf-workspace=staging" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "tf-workspace=dev" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "tf-workspace=dev" >> $GITHUB_OUTPUT
+          fi
+
+  # Plan phase: calls reusable workflow for each solution
+  plan-hub:
+    name: 'Plan hub-solution'
+    needs: determine-environment
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: hub-solution
+      working-directory: solutions/hub-solution
+      environment: ${{ needs.determine-environment.outputs.environment }}
+      tf-workspace: ${{ needs.determine-environment.outputs.tf-workspace }}
+    secrets: inherit
+
+  plan-spoke:
+    name: 'Plan spoke-solution'
+    needs: determine-environment
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: spoke-solution
+      working-directory: solutions/spoke-solution
+      environment: ${{ needs.determine-environment.outputs.environment }}
+      tf-workspace: ${{ needs.determine-environment.outputs.tf-workspace }}
+    secrets: inherit
+
+  plan-iot:
+    name: 'Plan iot-solution'
+    needs: determine-environment
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: iot-solution
+      working-directory: solutions/iot
+      environment: ${{ needs.determine-environment.outputs.environment }}
+      tf-workspace: ${{ needs.determine-environment.outputs.tf-workspace }}
+    secrets: inherit
+
+  plan-deployment:
+    name: 'Plan deployment-root'
+    needs: determine-environment
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: deployment-root
+      working-directory: deployment
+      environment: ${{ needs.determine-environment.outputs.environment }}
+      tf-workspace: ${{ needs.determine-environment.outputs.tf-workspace }}
+    secrets: inherit
+
+  # Apply phase: independent deployments (each runs as soon as its plan finishes)
+  apply-hub:
+    name: 'Apply hub-solution'
+    needs: [determine-environment, plan-hub]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment: 
+      name: ${{ needs.determine-environment.outputs.environment }}
+      url: https://portal.azure.com
+    defaults:
+      run:
+        working-directory: solutions/hub-solution
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: tfplan-hub-solution-${{ needs.determine-environment.outputs.environment }}
+          path: solutions/hub-solution
+      - name: Terraform Init
+        run: |
+          if [ -f "tfplan" ]; then
+            terraform init
+          else
+            echo "No plan found, skipping init."
+          fi
+      - name: Terraform Apply to ${{ needs.determine-environment.outputs.environment }}
+        env:
+          TF_WORKSPACE: ${{ needs.determine-environment.outputs.tf-workspace }}
+          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
+        run: |
+          if [ -f "tfplan" ]; then
+            echo "Deploying to $ENVIRONMENT environment..."
+            echo "Azure Subscription: $ARM_SUBSCRIPTION_ID"
+            echo "Terraform Workspace: $TF_WORKSPACE"
+            
+            terraform workspace select $TF_WORKSPACE || terraform workspace new $TF_WORKSPACE
+            terraform apply tfplan
+            
+            echo "Deployment to $ENVIRONMENT completed successfully!"
+          else
+            echo "No plan found (or no changes detected), skipping apply."
+          fi
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: hub-solution" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Azure Portal**: [View Resources](https://portal.azure.com)" >> $GITHUB_STEP_SUMMARY
+
+  apply-spoke:
+    name: 'Apply spoke-solution'
+    needs: [determine-environment, plan-spoke]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment: 
+      name: ${{ needs.determine-environment.outputs.environment }}
+      url: https://portal.azure.com
+    defaults:
+      run:
+        working-directory: solutions/spoke-solution
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: tfplan-spoke-solution-${{ needs.determine-environment.outputs.environment }}
+          path: solutions/spoke-solution
+      - name: Terraform Init
+        run: |
+          if [ -f "tfplan" ]; then
+            terraform init
+          else
+            echo "No plan found, skipping init."
+          fi
+      - name: Terraform Apply to ${{ needs.determine-environment.outputs.environment }}
+        env:
+          TF_WORKSPACE: ${{ needs.determine-environment.outputs.tf-workspace }}
+          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
+        run: |
+          if [ -f "tfplan" ]; then
+            echo "Deploying to $ENVIRONMENT environment..."
+            echo "Azure Subscription: $ARM_SUBSCRIPTION_ID"
+            echo "Terraform Workspace: $TF_WORKSPACE"
+            
+            terraform workspace select $TF_WORKSPACE || terraform workspace new $TF_WORKSPACE
+            terraform apply tfplan
+            
+            echo "Deployment to $ENVIRONMENT completed successfully!"
+          else
+            echo "No plan found (or no changes detected), skipping apply."
+          fi
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: spoke-solution" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Azure Portal**: [View Resources](https://portal.azure.com)" >> $GITHUB_STEP_SUMMARY
+
+  apply-iot:
+    name: 'Apply iot-solution'
+    needs: [determine-environment, plan-iot]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment: 
+      name: ${{ needs.determine-environment.outputs.environment }}
+      url: https://portal.azure.com
+    defaults:
+      run:
+        working-directory: solutions/iot
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: tfplan-iot-solution-${{ needs.determine-environment.outputs.environment }}
+          path: solutions/iot
+      - name: Terraform Init
+        run: |
+          if [ -f "tfplan" ]; then
+            terraform init
+          else
+            echo "No plan found, skipping init."
+          fi
+      - name: Terraform Apply to ${{ needs.determine-environment.outputs.environment }}
+        env:
+          TF_WORKSPACE: ${{ needs.determine-environment.outputs.tf-workspace }}
+          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
+        run: |
+          if [ -f "tfplan" ]; then
+            echo "Deploying to $ENVIRONMENT environment..."
+            echo "Azure Subscription: $ARM_SUBSCRIPTION_ID"
+            echo "Terraform Workspace: $TF_WORKSPACE"
+            
+            terraform workspace select $TF_WORKSPACE || terraform workspace new $TF_WORKSPACE
+            terraform apply tfplan
+            
+            echo "Deployment to $ENVIRONMENT completed successfully!"
+          else
+            echo "No plan found (or no changes detected), skipping apply."
+          fi
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: iot-solution" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Azure Portal**: [View Resources](https://portal.azure.com)" >> $GITHUB_STEP_SUMMARY
+
+  apply-deployment:
+    name: 'Apply deployment-root'
+    needs: [determine-environment, plan-deployment]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment: 
+      name: ${{ needs.determine-environment.outputs.environment }}
+      url: https://portal.azure.com
+    defaults:
+      run:
+        working-directory: deployment
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: tfplan-deployment-root-${{ needs.determine-environment.outputs.environment }}
+          path: deployment
+      - name: Terraform Init
+        run: |
+          if [ -f "tfplan" ]; then
+            terraform init
+          else
+            echo "No plan found, skipping init."
+          fi
+      - name: Terraform Apply to ${{ needs.determine-environment.outputs.environment }}
+        env:
+          TF_WORKSPACE: ${{ needs.determine-environment.outputs.tf-workspace }}
+          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
+        run: |
+          if [ -f "tfplan" ]; then
+            echo "Deploying to $ENVIRONMENT environment..."
+            echo "Azure Subscription: $ARM_SUBSCRIPTION_ID"
+            echo "Terraform Workspace: $TF_WORKSPACE"
+            
+            terraform workspace select $TF_WORKSPACE || terraform workspace new $TF_WORKSPACE
+            terraform apply tfplan
+            
+            echo "Deployment to $ENVIRONMENT completed successfully!"
+          else
+            echo "No plan found (or no changes detected), skipping apply."
+          fi
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: deployment-root" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Azure Portal**: [View Resources](https://portal.azure.com)" >> $GITHUB_STEP_SUMMARY

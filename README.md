@@ -53,9 +53,9 @@ Refer to the module READMEs for detailed information on configuring each module.
 The following improvements are planned to elevate the repository to a production-grade standard:
 
 - [ ] **Monorepo Strategy**: Switch `solutions/` to use relative paths for modules (`source = "../../modules/..."`) instead of remote git URLs to enable faster local development and testing.
-- [ ] **CI/CD Enhancements**:
-    - [ ] Add **Pull Request Plan Comments** to visualize infrastructure changes directly in PRs.
-    - [ ] Integrate **Infracost** for cost estimation in Pull Requests.
+- [x] **CI/CD Enhancements**:
+    - [x] Add **Pull Request Plan Comments** to visualize infrastructure changes directly in PRs.
+    - [x] Integrate **Infracost** for cost estimation in Pull Requests.
     - [ ] Implement **Renovate** or **Dependabot** for automated dependency updates.
 - [ ] **Advanced Testing**: Introduce **Terratest** (Go) for integration testing to validate that creating infrastructure actually works as expected.
 - [ ] **Security**:

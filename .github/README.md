@@ -1,36 +1,44 @@
 # CI/CD Pipeline Documentation
 
-This repository uses GitHub Actions to ensure code quality and correctness.
+This repository uses GitHub Actions to automate Terraform validation and deployment with a multi-environment, OIDC-authenticated approach.
 
-## Workflows
+## 1. Reusable Workflow (`terraform-plan.yml`)
+Contains the core foundational logic for Terraform. It is called by the other pipelines and handles:
+- Code checking (`terraform fmt`)
+- Initialization (`terraform init`)
+- Security Scans (**tfsec**, **Checkov**)
+- Validation and Planning (`terraform plan` with environment-specific `tfvars`)
+- **Drift Detection** (Blocks pipeline if Azure resources changed outside of Terraform)
+- **Infracost** Cost Estimation
+- Publishing PR Comments with the plan and cost details.
 
-**Terraform CI** (defined in `.github/workflows/terraform.yml`) triggers on:
-- Push to `main` branch
-- Pull requests to `main` branch
+## 2. PR Validation (`azure-deploy.yml`)
+**Trigger:** Pull Requests targeting `develop` branch.
+**Purpose:** Pre-merge validation. 
+- Runs the reusable `terraform-plan.yml` in the `dev` environment context.
+- Uses DEV credentials and the DEV state file.
+- **Does NOT deploy anything.**
+- Posts the Terraform Plan and Cost Estimate as comments on the PR so reviewers can evaluate the impact before merging.
 
-## Checks Performed
+## 3. Multi-Environment Deployment (`azure-deploy-multi-env.yml`)
+**Trigger:** Push to `develop`, `staging`, or `main`.
+**Purpose:** Actual deployment of infrastructure.
 
-The pipeline runs the following checks:
+### The Flow:
+1. **Determine Environment:** Detects branch (`develop` → `dev`, `staging` → `staging`, `main` → `production`).
+2. **Plan (Parallel):** Uses the reusable workflow to securely plan changes for `hub-solution`, `spoke-solution`, `iot`, and `deployment` simultaneously.
+3. **Apply (Parallel):** Once a specific solution's plan succeeds:
+   - For `dev`: It deploys automatically.
+   - For `staging`/`production`: It pauses and waits for **Manual Approval** in the GitHub UI (based on GitHub Environment Protection Rules).
+   - Once approved, each solution applies independently.
 
-1.  **Format Check**: 
-    - Runs `terraform fmt -check -recursive`
-    - Ensures all Terraform files follow standard formatting conventions.
-
-2.  **Deployment Validation**:
-    - Runs `terraform init` and `terraform validate` in the `deployment/` directory.
-    - Verifies syntax and configuration validity for the main deployment example.
-
-3.  **IoT Solution Validation**:
-    - Runs `terraform init` and `terraform validate` in `solutions/iot/`.
-    - validates the IoT reference architecture configuration.
-
-4.  **Spoke Solution Validation**:
-    - Runs `terraform init` and `terraform validate` in `solutions/spoke-solution/`.
-    - Validates the Spoke Network reference architecture.
+## Authentication (OIDC)
+This repository uses **OpenID Connect (OIDC)** for federated identity.
+- We do **not** use `AZURE_CLIENT_SECRET`.
+- You must configure a federated identity credential on your Azure AD App Registration for each environment, pointing to the GitHub repository environments.
 
 ## How to Check Results
-
 When you open a Pull Request:
-1.  Navigate to the "Checks" tab or scroll to the bottom of the PR conversation.
-2.  If a check fails, click "Details" to see the full log.
-3.  Fix the issue locally (e.g., run `terraform fmt -recursive`) and push again.
+1. Navigate to the PR conversation.
+2. The GitHub Actions bot will post the **Terraform Plan** and **Infracost Cost Estimate** directly in the comments.
+3. If the plan fails, look for the `Checks` tab at the bottom to see logs and fix the issue.

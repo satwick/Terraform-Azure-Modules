@@ -1,172 +1,57 @@
-name: 'Azure Deploy (Unified)'
+name: 'Terraform PR Validation'
 
+# Triggered only on Pull Requests from feature branches targeting develop
+# Uses DEV environment credentials and state file for validation
 on:
-  push:
-    branches: [ "main" ]
+  pull_request:
+    branches: [ "develop" ]
     paths:
       - 'solutions/**'
       - 'deployment/**'
       - '.github/workflows/azure-deploy.yml'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'solutions/**'
-      - 'deployment/**'
 
-permissions:
-  id-token: write
-  contents: read
-  pull-requests: write
+# Cancel previous runs for the same PR branch
+concurrency:
+  group: terraform-pr-${{ github.head_ref }}
+  cancel-in-progress: true
 
 jobs:
-  plan:
-    name: 'Terraform Plan'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: 'hub-solution'
-            directory: 'solutions/hub-solution'
-          - name: 'spoke-solution'
-            directory: 'solutions/spoke-solution'
-          - name: 'iot-solution'
-            directory: 'solutions/iot'
-          - name: 'deployment-root'
-            directory: 'deployment'
-    
-    defaults:
-      run:
-        working-directory: ${{ matrix.directory }}
+  validate-hub:
+    name: 'Validate hub-solution'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: hub-solution
+      working-directory: solutions/hub-solution
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
 
-    outputs:
-      exitcode: ${{ steps.plan.outputs.exitcode }}
+  validate-spoke:
+    name: 'Validate spoke-solution'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: spoke-solution
+      working-directory: solutions/spoke-solution
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+  validate-iot:
+    name: 'Validate iot-solution'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: iot-solution
+      working-directory: solutions/iot
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
 
-      - name: Check for Changes
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            src:
-              - '${{ matrix.directory }}/**'
-
-      - name: Setup Terraform
-        if: steps.changes.outputs.src == 'true'
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.7
-
-      - name: Terraform Init
-        if: steps.changes.outputs.src == 'true'
-        run: terraform init
-
-      # Security Scanning
-      - name: Run tfsec
-        if: steps.changes.outputs.src == 'true'
-        uses: aquasecurity/tfsec-action@v1.0.0
-        with:
-          soft_fail: true
-          working_directory: ${{ matrix.directory }}
-
-      - name: Run Checkov
-        if: steps.changes.outputs.src == 'true'
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: ${{ matrix.directory }}
-          framework: terraform
-          quiet: true
-          soft_fail: true
-
-      - name: Terraform Validate
-        if: steps.changes.outputs.src == 'true'
-        run: terraform validate
-
-      - name: Terraform Plan
-        if: steps.changes.outputs.src == 'true'
-        id: plan
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: |
-          terraform plan -detailed-exitcode -out=tfplan || exit_code=$?
-          echo "Exit Code: $exit_code"
-          echo "exitcode=$exit_code" >> $GITHUB_OUTPUT
-          
-          if [ $exit_code -eq 1 ]; then
-            echo "::error::Terraform Plan Failed!"
-            exit 1
-          fi
-
-      - name: Publish Artifact
-        if: steps.changes.outputs.src == 'true' && steps.plan.outputs.exitcode == '2'
-        uses: actions/upload-artifact@v3
-        with:
-          name: tfplan-${{ matrix.name }}
-          path: ${{ matrix.directory }}/tfplan
-
-  apply:
-    name: 'Terraform Apply'
-    needs: plan
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: 'hub-solution'
-            directory: 'solutions/hub-solution'
-          - name: 'spoke-solution'
-            directory: 'solutions/spoke-solution'
-          - name: 'iot-solution'
-            directory: 'solutions/iot'
-          - name: 'deployment-root'
-            directory: 'deployment'
-    
-    environment: production
-
-    defaults:
-      run:
-        working-directory: ${{ matrix.directory }}
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.7
-
-      - name: Download Plan
-        uses: actions/download-artifact@v3
-        continue-on-error: true
-        with:
-          name: tfplan-${{ matrix.name }}
-          path: ${{ matrix.directory }}
-
-      - name: Terraform Init
-        run: |
-          if [ -f "tfplan" ]; then
-            terraform init
-          else
-            echo "No plan found, skipping init."
-          fi
-
-      - name: Terraform Apply
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: |
-          if [ -f "tfplan" ]; then
-            terraform apply tfplan
-          else
-            echo "No plan found (or no changes detected), skipping apply."
-          fi
+  validate-deployment:
+    name: 'Validate deployment-root'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: deployment-root
+      working-directory: deployment
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
