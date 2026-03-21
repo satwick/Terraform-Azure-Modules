@@ -4,7 +4,7 @@ This repository contains reusable Terraform code for deploying resources on Micr
 
 [![Terraform CI](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml/badge.svg)](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml)
 
-See [.github/README.md](.github/README.md) for details on the CI pipeline. 
+See [.github/README.md](.github/README.md) for details on the CI pipeline.
 
 ## Repository Structure
 
@@ -47,3 +47,18 @@ Each module contains its own `README.md` describing available variables, outputs
    ```
 
 Refer to the module READMEs for detailed information on configuring each module.
+
+## Future Roadmap
+
+The following improvements are planned to elevate the repository to a production-grade standard:
+
+- [ ] **Monorepo Strategy**: Switch `solutions/` to use relative paths for modules (`source = "../../modules/..."`) instead of remote git URLs to enable faster local development and testing.
+- [x] **CI/CD Enhancements**:
+    - [x] Add **Pull Request Plan Comments** to visualize infrastructure changes directly in PRs.
+    - [x] Integrate **Infracost** for cost estimation in Pull Requests.
+    - [ ] Implement **Renovate** or **Dependabot** for automated dependency updates.
+- [ ] **Advanced Testing**: Introduce **Terratest** (Go) for integration testing to validate that creating infrastructure actually works as expected.
+- [ ] **Security**:
+    - [ ] Configure `hard_fail` for critical security rules in `tfsec`/`checkov`.
+    - [ ] Implement deeper drift detection monitoring.
+- [ ] **Documentation**: Generate automated architecture diagrams (e.g., using `pluralith` or `inframap`) in CI.

@@ -7,6 +7,30 @@ This solution demonstrates a Spoke network deployment, typically used in a Hub-S
 - **Virtual Network**: The spoke VNet.
 - **Route Table**: Custom routing for the spoke.
 - **Network Security Groups**: Security rules for the spoke.
+- **AKS**: Kubernetes cluster in the spoke.
+- **Data Services**: SQL, PostgreSQL, Storage in the spoke.
+
+## Architecture
+
+```mermaid
+graph LR
+    subgraph "Hub Network (Simulated)"
+        Hub[Hub VNet]
+        Firewall[Azure Firewall]
+    end
+
+    subgraph "Spoke Network"
+        SpokeVNet[Spoke VNet]
+        gateway[App Gateway]
+        aks[AKS Cluster]
+        db[Databases]
+        
+        SpokeVNet -- Peering --> Hub
+    end
+    
+    gateway --> aks
+    aks --> db
+```
 
 ## Usage
 

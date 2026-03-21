@@ -1,0 +1,57 @@
+name: 'Terraform PR Validation'
+
+# Triggered only on Pull Requests from feature branches targeting develop
+# Uses DEV environment credentials and state file for validation
+on:
+  pull_request:
+    branches: [ "develop" ]
+    paths:
+      - 'solutions/**'
+      - 'deployment/**'
+      - '.github/workflows/azure-deploy.yml'
+
+# Cancel previous runs for the same PR branch
+concurrency:
+  group: terraform-pr-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-hub:
+    name: 'Validate hub-solution'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: hub-solution
+      working-directory: solutions/hub-solution
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
+
+  validate-spoke:
+    name: 'Validate spoke-solution'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: spoke-solution
+      working-directory: solutions/spoke-solution
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
+
+  validate-iot:
+    name: 'Validate iot-solution'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: iot-solution
+      working-directory: solutions/iot
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit
+
+  validate-deployment:
+    name: 'Validate deployment-root'
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      solution-name: deployment-root
+      working-directory: deployment
+      environment: dev
+      tf-workspace: dev
+    secrets: inherit

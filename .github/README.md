@@ -1,49 +1,44 @@
-# Terraform Azure Modules
+# CI/CD Pipeline Documentation
 
-This repository contains reusable Terraform code for deploying resources on Microsoft Azure. Each folder under `modules/` represents a standalone module that can be integrated into your own Terraform configurations. The `deployment/` directory provides a simple example of how these modules can be consumed together.
+This repository uses GitHub Actions to automate Terraform validation and deployment with a multi-environment, OIDC-authenticated approach.
 
-[![Terraform CI](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml/badge.svg)](https://github.com/satwickcherukuri/Terraform-Azure-Modules/actions/workflows/terraform.yml)
+## 1. Reusable Workflow (`terraform-plan.yml`)
+Contains the core foundational logic for Terraform. It is called by the other pipelines and handles:
+- Code checking (`terraform fmt`)
+- Initialization (`terraform init`)
+- Security Scans (**tfsec**, **Checkov**)
+- Validation and Planning (`terraform plan` with environment-specific `tfvars`)
+- **Drift Detection** (Blocks pipeline if Azure resources changed outside of Terraform)
+- **Infracost** Cost Estimation
+- Publishing PR Comments with the plan and cost details.
 
-See [.github/README.md](.github/README.md) for details on the CI pipeline. 
+## 2. PR Validation (`azure-deploy.yml`)
+**Trigger:** Pull Requests targeting `develop` branch.
+**Purpose:** Pre-merge validation. 
+- Runs the reusable `terraform-plan.yml` in the `dev` environment context.
+- Uses DEV credentials and the DEV state file.
+- **Does NOT deploy anything.**
+- Posts the Terraform Plan and Cost Estimate as comments on the PR so reviewers can evaluate the impact before merging.
 
-## Repository Structure
+## 3. Multi-Environment Deployment (`azure-deploy-multi-env.yml`)
+**Trigger:** Push to `develop`, `staging`, or `main`.
+**Purpose:** Actual deployment of infrastructure.
 
-- **deployment/** – Sample root configuration demonstrating module usage.
-- **modules/** – Collection of reusable Terraform modules:
-  - **aks/** – Deploys an Azure Kubernetes Service cluster.
-  - **application-gateway/** – Creates an Azure Application Gateway that can serve as an ingress controller.
-  - **azure-sql-server/** – Provisions an Azure SQL Database server with a private endpoint.
-  - **key-vault/** – Manages an Azure Key Vault instance.
-  - **postgres-sql/** – Deploys a PostgreSQL Flexible Server.
-  - **route-table/** – Defines custom route tables for virtual networks.
-  - **storage-account/** – Creates a storage account with optional private endpoint and containers.
-  - **v-net/** – Builds a virtual network and subnets for hub/spoke scenarios.
-  - **vm-linux/** – Deploys a Linux virtual machine.
-  - **vm-windows/** – Deploys a Windows virtual machine.
-- **solutions/** – Reference architectures combining multiple modules:
-  - **iot/** – Example IoT solution architecture.
-  - **spoke-solution/** – Example spoke network deployment.
+### The Flow:
+1. **Determine Environment:** Detects branch (`develop` → `dev`, `staging` → `staging`, `main` → `production`).
+2. **Plan (Parallel):** Uses the reusable workflow to securely plan changes for `hub-solution`, `spoke-solution`, `iot`, and `deployment` simultaneously.
+3. **Apply (Parallel):** Once a specific solution's plan succeeds:
+   - For `dev`: It deploys automatically.
+   - For `staging`/`production`: It pauses and waits for **Manual Approval** in the GitHub UI (based on GitHub Environment Protection Rules).
+   - Once approved, each solution applies independently.
 
-Each module contains its own `README.md` describing available variables, outputs and any specific considerations.
+## Authentication (OIDC)
+This repository uses **OpenID Connect (OIDC)** for federated identity.
+- We do **not** use `AZURE_CLIENT_SECRET`.
+- You must configure a federated identity credential on your Azure AD App Registration for each environment, pointing to the GitHub repository environments.
 
-## Prerequisites
-
-- [Terraform](https://www.terraform.io/downloads.html) 1.x installed
-- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and authenticated
-- Access to an Azure subscription with permission to create resources
-
-## Getting Started
-
-1. Change into the `deployment` directory:
-   ```bash
-   cd deployment
-   terraform init
-   ```
-2. Review `variables.tf` and supply any required values, either by editing a `terraform.tfvars` file or via CLI variables.
-3. Run Terraform to review and apply changes:
-   ```bash
-   terraform plan
-   terraform apply
-   ```
-
-Refer to the module READMEs for detailed information on configuring each module.
+## How to Check Results
+When you open a Pull Request:
+1. Navigate to the PR conversation.
+2. The GitHub Actions bot will post the **Terraform Plan** and **Infracost Cost Estimate** directly in the comments.
+3. If the plan fails, look for the `Checks` tab at the bottom to see logs and fix the issue.

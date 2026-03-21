@@ -1,0 +1,253 @@
+name: 'Terraform Plan (Reusable)'
+
+# Reusable workflow: contains all shared Terraform plan steps
+# Called by azure-deploy.yml (PR validation) and azure-deploy-multi-env.yml (deployment)
+on:
+  workflow_call:
+    inputs:
+      solution-name:
+        description: 'Name of the solution (e.g., hub-solution)'
+        required: true
+        type: string
+      working-directory:
+        description: 'Path to the Terraform directory'
+        required: true
+        type: string
+      environment:
+        description: 'GitHub environment name (dev, staging, production)'
+        required: true
+        type: string
+      tf-workspace:
+        description: 'Terraform workspace name'
+        required: true
+        type: string
+      terraform-version:
+        description: 'Terraform version to use'
+        required: false
+        type: string
+        default: '1.5.7'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_USE_OIDC: true
+
+jobs:
+  plan:
+    name: 'Plan - ${{ inputs.solution-name }} (${{ inputs.environment }})'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    outputs:
+      exitcode: ${{ steps.plan.outputs.exitcode }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            src:
+              - '${{ inputs.working-directory }}/**'
+
+      - name: Setup Terraform
+        if: steps.changes.outputs.src == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+
+      - name: Terraform Format Check
+        if: steps.changes.outputs.src == 'true'
+        run: terraform fmt -check -recursive -diff
+
+      - name: Terraform Init
+        if: steps.changes.outputs.src == 'true'
+        run: terraform init
+
+      # Security Scanning
+      - name: Run tfsec
+        if: steps.changes.outputs.src == 'true'
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          soft_fail: true
+          working_directory: ${{ inputs.working-directory }}
+
+      - name: Run Checkov
+        if: steps.changes.outputs.src == 'true'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: ${{ inputs.working-directory }}
+          framework: terraform
+          quiet: true
+          soft_fail: true
+
+      - name: Terraform Validate
+        if: steps.changes.outputs.src == 'true'
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: steps.changes.outputs.src == 'true'
+        id: plan
+        env:
+          TF_WORKSPACE: ${{ inputs.tf-workspace }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          terraform workspace select $TF_WORKSPACE || terraform workspace new $TF_WORKSPACE
+
+          if [ -f "terraform.$ENVIRONMENT.tfvars" ]; then
+            terraform plan -detailed-exitcode -var-file="terraform.$ENVIRONMENT.tfvars" -out=tfplan || exit_code=$?
+          else
+            terraform plan -detailed-exitcode -out=tfplan || exit_code=$?
+          fi
+
+          echo "Exit Code: $exit_code"
+          echo "exitcode=$exit_code" >> $GITHUB_OUTPUT
+
+          if [ $exit_code -eq 1 ]; then
+            echo "::error::Terraform Plan Failed!"
+            exit 1
+          fi
+
+      # Drift Detection: Block pipeline if resources changed outside Terraform
+      - name: Detect Terraform Drift
+        if: steps.changes.outputs.src == 'true' && steps.plan.outputs.exitcode == '2'
+        env:
+          TF_WORKSPACE: ${{ inputs.tf-workspace }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          echo "Scanning Terraform plan for drift indicators ($ENVIRONMENT)..."
+          terraform workspace select $TF_WORKSPACE
+          terraform show -no-color tfplan > plan_output.txt
+
+          DRIFT_PATTERNS=(
+            "has been changed outside of Terraform"
+            "has been deleted outside of Terraform"
+            "has drifted"
+            "Note: Objects have changed outside of Terraform"
+          )
+
+          DRIFT_FOUND=false
+          DRIFT_DETAILS=""
+
+          for pattern in "${DRIFT_PATTERNS[@]}"; do
+            if grep -qi "$pattern" plan_output.txt; then
+              DRIFT_FOUND=true
+              MATCHES=$(grep -i "$pattern" plan_output.txt)
+              DRIFT_DETAILS="${DRIFT_DETAILS}\n  Pattern matched: '${pattern}'\n${MATCHES}\n"
+            fi
+          done
+
+          if [ "$DRIFT_FOUND" = true ]; then
+            echo "=========================================="
+            echo "DRIFT DETECTED ($ENVIRONMENT) -- Pipeline Blocked"
+            echo "=========================================="
+            echo -e "$DRIFT_DETAILS"
+            echo ""
+            echo "Resources have been created or modified outside of Terraform."
+            echo "Review the plan output above and reconcile drift before proceeding."
+
+            echo "::error::Terraform drift detected for ${{ inputs.solution-name }} ($ENVIRONMENT). Resources have been changed outside of Terraform."
+
+            echo "### Drift Detected -- ${{ inputs.solution-name }} ($ENVIRONMENT)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Infrastructure drift was detected in **$ENVIRONMENT**." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo -e "$DRIFT_DETAILS" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            exit 1
+          else
+            echo "No drift detected in $ENVIRONMENT. Proceeding."
+          fi
+
+      # Infracost: Estimate cloud cost impact of Terraform changes
+      - name: Setup Infracost
+        if: steps.changes.outputs.src == 'true' && steps.plan.outputs.exitcode == '2'
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost Cost Estimate
+        if: steps.changes.outputs.src == 'true' && steps.plan.outputs.exitcode == '2'
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          infracost breakdown \
+            --path=. \
+            --format=json \
+            --out-file=/tmp/infracost-${{ inputs.solution-name }}.json
+
+          echo "### Cost Estimate - ${{ inputs.solution-name }} ($ENVIRONMENT)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          infracost output \
+            --path=/tmp/infracost-${{ inputs.solution-name }}.json \
+            --format=table >> $GITHUB_STEP_SUMMARY
+
+      - name: Post Infracost Cost Estimate to PR
+        if: steps.changes.outputs.src == 'true' && steps.plan.outputs.exitcode == '2' && github.event_name == 'pull_request'
+        uses: infracost/actions/comment@v1
+        with:
+          path: /tmp/infracost-${{ inputs.solution-name }}.json
+          behavior: update
+
+      # Upload plan artifact for apply job (only on push events)
+      - name: Publish Artifact
+        if: steps.changes.outputs.src == 'true' && steps.plan.outputs.exitcode == '2' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.solution-name }}-${{ inputs.environment }}
+          path: ${{ inputs.working-directory }}/tfplan
+
+      - name: Generate Plan Summary
+        if: steps.changes.outputs.src == 'true' && github.event_name == 'pull_request'
+        id: plan-summary
+        env:
+          TF_WORKSPACE: ${{ inputs.tf-workspace }}
+        run: |
+          terraform workspace select $TF_WORKSPACE
+          terraform show -no-color tfplan > plan_output.txt
+          echo "PLAN_OUTPUT<<EOF" >> $GITHUB_OUTPUT
+          cat plan_output.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with Plan
+        if: steps.changes.outputs.src == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN: "${{ steps.plan-summary.outputs.PLAN_OUTPUT }}"
+          ENVIRONMENT: "${{ inputs.environment }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Plan - \`${{ inputs.solution-name }}\` (**${process.env.ENVIRONMENT.toUpperCase()}** Environment)
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Author: @${{ github.actor }}, Environment: **${process.env.ENVIRONMENT}**, Directory: \`${{ inputs.working-directory }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })

@@ -1,0 +1,169 @@
+# Common
+location            = "West Europe"
+resource_group_name = "rg-spoke-dev-001"
+environment         = "DEV"
+tags = {
+  Environment = "Dev"
+  Project     = "Spoke Solution"
+}
+
+# VNet
+devspoke_vnet_name          = "vnet-spoke-dev-001"
+devspoke_vnet_address_space = ["10.1.0.0/16"]
+
+# Subnets
+database_snet_address_prefix = "10.1.1.0/24"
+support_snet_address_prefix  = "10.1.2.0/24"
+aks_snet_address_prefix      = "10.1.3.0/24"
+gateway_snet_address_prefix  = "10.1.4.0/24"
+
+# Route Table
+route_table_name            = "rt-spoke-dev-001"
+devspoke_route_table_routes = {}
+
+# Linux VM
+vm_linux_name     = "vm-linux-dev-001"
+vm_linux_username = "adminuser"
+vm_linux_password = "SecurePassword123!"
+custom_data_path  = "scripts/cloud-init.yaml.b64"
+
+# Windows VM
+vm_windows_name     = "vm-win-dev-001"
+vm_windows_username = "adminuser"
+vm_windows_password = "SecurePassword123!"
+
+# Storage Accounts
+# Devspoke
+devspoke_storage_name                       = "stdevspokedev001"
+devspoke_storage_account_tier               = "Standard"
+devspoke_storage_account_kind               = "StorageV2"
+devspoke_storage_account_replication_type   = "LRS"
+devspoke_cross_tenant_replication_enabled   = false
+devspoke_change_feed_enabled                = false
+devspoke_versioning_enabled                 = false
+devspoke_storage_containers                 = ["container1"]
+devspoke_storage_private_endpoint_name      = "pe-st-devspoke-dev-001"
+
+# Infox
+devspoke_infox_storage_name                       = "stinfoxdev001"
+devspoke_infox_storage_account_tier               = "Standard"
+devspoke_infox_storage_account_kind               = "StorageV2"
+devspoke_infox_storage_account_replication_type   = "LRS"
+devspoke_infox_cross_tenant_replication_enabled   = false
+devspoke_infox_change_feed_enabled                = false
+devspoke_infox_versioning_enabled                 = false
+devspoke_infox_storage_containers                 = ["data"]
+devspoke_infox_storage_private_endpoint_name      = "pe-st-infox-dev-001"
+
+# Treasure
+devspoke_treasure_storage_name                       = "sttreasuredev001"
+devspoke_treasure_storage_account_tier               = "Standard"
+devspoke_treasure_storage_account_kind               = "StorageV2"
+devspoke_treasure_storage_account_replication_type   = "LRS"
+devspoke_treasure_cross_tenant_replication_enabled   = false
+devspoke_treasure_change_feed_enabled                = false
+devspoke_treasure_versioning_enabled                 = false
+devspoke_treasure_storage_containers                 = ["archive"]
+devspoke_treasure_storage_private_endpoint_name      = "pe-st-treasure-dev-001"
+
+# Montaviz
+devspoke_montaviz_storage_name                       = "stmontavizdev001"
+devspoke_montaviz_storage_account_tier               = "Standard"
+devspoke_montaviz_storage_account_kind               = "StorageV2"
+devspoke_montaviz_storage_account_replication_type   = "LRS"
+devspoke_montaviz_cross_tenant_replication_enabled   = false
+devspoke_montaviz_change_feed_enabled                = false
+devspoke_montaviz_versioning_enabled                 = false
+devspoke_montaviz_storage_containers                 = ["media"]
+devspoke_montaviz_storage_private_endpoint_name      = "pe-st-montaviz-dev-001"
+
+# Key Vaults
+# Devspoke
+devspoke_keyvault_name                        = "kv-devspoke-dev-001"
+devspoke_keyvault_sku_name                    = "standard"
+devspoke_keyvault_soft_delete_retention_days  = 7
+devspoke_keyvault_private_endpoint_name       = "pe-kv-devspoke-dev-001"
+devspoke_keyvault_public_network_access       = false
+devspoke_keyvault_enable_rbac_authorization   = true
+keyvault_network_acls = {
+  bypass         = "AzureServices"
+  default_action = "Deny"
+  ip_rules       = []
+}
+
+# Montaviz
+montaviz_keyvault_name                        = "kv-montaviz-dev-001"
+montaviz_keyvault_sku_name                    = "standard"
+montaviz_keyvault_soft_delete_retention_days  = 7
+montaviz_keyvault_private_endpoint_name       = "pe-kv-montaviz-dev-001"
+montaviz_keyvault_public_network_access       = false
+montaviz_keyvault_enable_rbac_authorization   = true
+
+# SQL Server
+sql_server_name                         = "sql-spoke-dev-001"
+sql_server_administrator_login          = "sqladmin"
+sql_server_administrator_login_password = "SecurePassword123!"
+devspoke_sql_hub_private_endpoint_name  = "pe-sql-hub-dev-001"
+sql_server_subresource_name             = ["sqlServer"]
+
+# PostgreSQL
+psql_name                    = "psql-spoke-dev-001"
+psql_username                = "psqladmin"
+psql_password                = "SecurePassword123!"
+psql_sku_name                = "B_Standard_B1ms"
+psql_version                 = "12"
+psql_storage_mb              = 32768
+psql_backup_retention_days   = 7
+psql_zone                    = 1
+
+# Application Gateway
+application_gateway_name           = "appgw-spoke-dev-001"
+appgw_private_ip_address           = "10.1.4.10"
+appgw_public_ip_address_id         = null
+shared_key_vault_name              = "kv-shared-dev-001"
+shared_key_vault_resource_group    = "rg-shared-dev-001"
+shared_certificate_name            = "appgw-cert"
+devspoke_appgw_private_endpoint_name = "pe-appgw-spoke-dev-001"
+
+# Private Endpoints Targets
+target_subscription_id     = "00000000-0000-0000-0000-000000000000"
+client_id_target           = "00000000-0000-0000-0000-000000000000"
+client_secret_target       = "client-secret-value"
+tenant_id_target           = "00000000-0000-0000-0000-000000000000"
+target_resource_group_name = "rg-hub-core-001"
+target_vnet_name           = "vnet-hub-core-001"
+target_snet_name           = "snet-pe-core-001"
+pe_resource_group_name     = "rg-pe-spoke-dev-001"
+pe_resource_group_location = "West Europe"
+
+# ACR
+build_resource_group_name         = "rg-build-core-001"
+build_acr_name                    = "acrbuildcore001"
+acr_build_private_endpoint_name   = "pe-acr-build-dev-001"
+
+# Managed Identity
+managed_identity_name = "mi-spoke-dev-001"
+
+# AKS
+aks_name               = "aks-spoke-dev-001"
+aks_kubernetes_version = "1.27.7"
+aks_private_cluster    = true
+aks_addons = {
+  azure_policy = true
+}
+azure_ad_rbac_enabled = true
+
+aks_default_node_pool = {
+  name                           = "default"
+  node_count                     = 2
+  vm_size                        = "Standard_D2s_v3"
+  max_pods                       = 30
+  zones                          = ["1", "2", "3"]
+  labels                         = {}
+  taints                         = []
+  cluster_auto_scaling           = true
+  cluster_auto_scaling_min_count = 2
+  cluster_auto_scaling_max_count = 5
+}
+
+aks_additional_node_pools = {}
